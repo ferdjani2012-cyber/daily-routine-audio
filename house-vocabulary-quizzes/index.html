@@ -61,7 +61,7 @@ const modelThumbs={
 "Table":"table","Chair":"chair","Lamp":"lampsquarefloor",
 "Double bed":"beddouble","Mirror":"bathroommirror","Single bed":"bedsingle"
 };
-const modelThumbBase="https://hidencod.github.io/tge-assets/packs/furniture-kit/thumbs/";
+const modelThumbBase="https://raw.githubusercontent.com/Hidencod/tge-assets/main/packs/furniture-kit/thumbs/";
 function pictureMarkup(item){const name=String(item[0]);const asset=modelThumbs[name];if(asset)return '<img class="quiz-illustration" src="'+modelThumbBase+asset+'.webp" alt="'+name.replace(/"/g,"&quot;")+'" loading="lazy" decoding="async">';const icon=escapeSvg(iconFor(item));return '<svg class="quiz-illustration" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="'+name.replace(/"/g,"&quot;")+'"><ellipse cx="200" cy="262" rx="104" ry="13" fill="#14213D" opacity=".12"/><circle cx="200" cy="140" r="114" fill="#fff"/><text x="200" y="184" text-anchor="middle" font-size="124" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">'+icon+'</text></svg>'}
 function setImage(el,item){el.innerHTML=pictureMarkup(item)}
 function options(item){const used=new Set([iconFor(item)]),p=[];for(const x of shuffle(activeGroup.items)){if(x===item||x[0]===item[0]||used.has(iconFor(x)))continue;used.add(iconFor(x));p.push(x);if(p.length===3)break}if(p.length<3)for(const x of shuffle(activeGroup.items)){if(x!==item&&!p.includes(x)){p.push(x);if(p.length===3)break}}return shuffle([item,...p])}
