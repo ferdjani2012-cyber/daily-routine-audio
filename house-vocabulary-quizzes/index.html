@@ -28,9 +28,29 @@ let activeGroup=null,questions=[],index=0,points=0,answered=false,audio=null,mod
 const $=id=>document.getElementById(id);
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
 function speak(item){if(audio){audio.pause();audio.currentTime=0}audio=new Audio(audioBase+item[1]+".mp3");audio.play().catch(()=>{$("feedback").textContent="Audio could not load. Check your connection and tap 🔊 again."})}
-function picture(query){return new Promise(resolve=>{const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent("filetype:bitmap "+query)+"&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*";fetch(url).then(r=>r.json()).then(d=>{const pages=Object.values(d.query?.pages||{});const p=pages.find(x=>x.imageinfo?.[0]?.thumburl);resolve(p?.imageinfo?.[0]?.thumburl||"")}).catch(()=>resolve(""))})}
-const cache={};function getPic(item){if(!cache[item[0]])cache[item[0]]=picture(item[2]);return cache[item[0]]}
-function setImage(el,item){el.innerHTML='<span class="loading">Loading picture…</span>';getPic(item).then(src=>{if(src){el.innerHTML="";const im=document.createElement("img");im.src=src;im.alt=item[0];im.loading="lazy";im.onerror=()=>el.innerHTML='<span class="loading">Picture unavailable</span>';el.appendChild(im)}else el.innerHTML='<span class="loading">Picture unavailable — try another question.</span>'})}
+function iconFor(item){
+const map={"Sofa":"🛋️","Armchair":"🪑","Television":"📺","Coffee table":"🪵","Bookshelf":"📚","Fridge":"🧊","Cooker":"🍳","Sink":"🚰","Microwave":"🍲","Table":"🪵","Chair":"🪑","Lamp":"💡","Double bed":"🛏️","Wardrobe":"🚪","Mirror":"🪞","Single bed":"🛏️","Laptop":"💻","Desk chair":"🪑","Bathtub":"🛁","Toilet":"🚽","Washbasin":"🚰","Washing machine":"🧺","Rooftop":"🏠","Plant":"🪴","Balcony":"🏡","Flowers":"💐","Floor":"🪵","Curtain":"🪟","Door":"🚪","Stairs":"🪜","Big":"🏘️","Small":"🏡","Quiet":"🤫","Cozy":"🛋️","Old":"🏚️","Traditional":"🏠","Beautiful":"🏡","One-floor":"🏠","Two-floor":"🏘️","Modern":"🏙️","Comfortable":"🛋️","Clean":"✨","Tidy":"🧹","Messy":"🧸","Wooden":"🪵","Metal":"🔩","Plastic":"🧴","Glass":"🥛","On":"⬆️","Under":"⬇️","Behind":"↩️","In front of":"↪️","Next to":"↔️","Opposite":"↔️","Between":"↔️","In the corner of":"📐","In the middle of":"🎯","Above":"⬆️","Near":"📍"};
+return map[item[0]]||"🏡";
+}
+function fallbackPicture(item){
+const label=item[0].replace(/&/g,"and");
+const svg='<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#edf5ff"/><stop offset="1" stop-color="#d5e7fb"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#24466b" flood-opacity=".18"/></filter></defs><rect width="600" height="420" rx="28" fill="url(#g)"/><circle cx="300" cy="176" r="112" fill="#fff" filter="url(#s)"/><text x="300" y="220" text-anchor="middle" font-size="126">'+iconFor(item)+'</text><text x="300" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#174b91">'+label+'</text></svg>';
+return "data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(svg);
+}
+function picture(item){
+return new Promise(resolve=>{
+const query=item[2]||item[0];
+const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent("filetype:bitmap "+query)+"&gsrnamespace=6&gsrlimit=18&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*";
+fetch(url).then(r=>r.json()).then(d=>{
+const pages=Object.values(d.query?.pages||{});
+const core=item[0].toLowerCase().split(/\\s+/).filter(w=>w.length>2&&!["the","of","in"].includes(w));
+const ranked=pages.map(p=>{const title=(p.title||"").toLowerCase().replace(/file:/,"").replace(/[^a-z0-9]+/g," ");const hits=core.filter(w=>title.includes(w)).length;return {p,hits}}).filter(x=>x.p.imageinfo?.[0]?.thumburl&&x.hits>0).sort((a,b)=>b.hits-a.hits);
+resolve(ranked[0]?.p.imageinfo[0].thumburl||fallbackPicture(item));
+}).catch(()=>resolve(fallbackPicture(item)));
+});
+}
+const cache={};function getPic(item){if(!cache[item[0]])cache[item[0]]=picture(item);return cache[item[0]]}
+function setImage(el,item){el.innerHTML='<span class="loading">Loading picture…</span>';getPic(item).then(src=>{el.innerHTML="";const im=document.createElement("img");im.src=src;im.alt=item[0];im.loading="lazy";el.appendChild(im)})}
 function start(group){activeGroup=group;questions=shuffle(group.items).slice(0,Math.min(10,group.items.length));index=0;points=0;$("home").classList.add("hidden");$("result").classList.add("hidden");$("quiz").classList.remove("hidden");show()}
 function show(){answered=false;const item=questions[index];$("qnum").textContent="Question "+(index+1)+" / "+questions.length;$("bar").style.width=(index/questions.length*100)+"%";$("score").textContent="⭐ "+points;$("feedback").className="feedback";$("feedback").textContent="";$("next").disabled=true;$("next").textContent=index===questions.length-1?"See my result →":"Next question →";$("listen").onclick=()=>speak(item);$("repeat").onclick=()=>speak(item);
 mode=index%2;
@@ -39,7 +59,7 @@ else{$("question").textContent="Listen and choose the picture";$("instruction").
 }
 function options(item){return shuffle([item,...shuffle(activeGroup.items.filter(x=>x!==item)).slice(0,3)])}
 function renderTextChoices(item){$("answers").className="answers";$("answers").innerHTML="";options(item).forEach(opt=>{const b=document.createElement("button");b.className="answer";b.textContent=opt[0];b.onclick=()=>check(b,opt,item);$("answers").appendChild(b)})}
-function renderPictureChoices(item){$("answers").innerHTML="";options(item).forEach(opt=>{const b=document.createElement("button");b.className="picAnswer";b.innerHTML='<div class="loading">Loading…</div><span>'+opt[0]+'</span>';getPic(opt).then(src=>{if(src){const im=document.createElement("img");im.src=src;im.alt=opt[0];im.onerror=()=>im.replaceWith(document.createTextNode("Image unavailable"));b.prepend(im);b.querySelector(".loading")?.remove()}else b.querySelector(".loading").textContent="Image unavailable"});b.onclick=()=>check(b,opt,item);$("answers").appendChild(b)})}
+function renderPictureChoices(item){$("answers").innerHTML="";options(item).forEach(opt=>{const b=document.createElement("button");b.className="picAnswer";b.innerHTML='<div class="loading">Loading…</div><span>'+opt[0]+'</span>';getPic(opt).then(src=>{const im=document.createElement("img");im.src=src;im.alt=opt[0];b.prepend(im);b.querySelector(".loading")?.remove()});b.onclick=()=>check(b,opt,item);$("answers").appendChild(b)})}
 function check(btn,opt,item){if(answered)return;answered=true;const ok=opt===item;if(ok)points++;document.querySelectorAll(".answer,.picAnswer").forEach(b=>{b.disabled=true;if(b.textContent.includes(item[0]))b.classList.add("correct")});if(!ok)btn.classList.add("wrong");$("feedback").className="feedback "+(ok?"good":"bad");$("feedback").textContent=ok?"✓ Correct! "+item[0]:"✗ Not quite. The correct answer is "+item[0]+".";if(mode===0)speak(item);$("score").textContent="⭐ "+points;$("next").disabled=false}
 function finish(){$("quiz").classList.add("hidden");$("result").classList.remove("hidden");$("bar").style.width="100%";$("finalscore").textContent=points+"/"+questions.length;$("message").textContent=points===questions.length?"Perfect! Excellent work.":points>=7?"Great job! Keep practising.":points>=4?"Good effort. Try again to improve.":"Keep practising — you can do it!"}
 $("next").onclick=()=>{if(index<questions.length-1){index++;show()}else finish()};$("back").onclick=()=>{$("quiz").classList.add("hidden");$("home").classList.remove("hidden")};$("again").onclick=()=>start(activeGroup);$("homebtn").onclick=()=>{$("result").classList.add("hidden");$("home").classList.remove("hidden")};
